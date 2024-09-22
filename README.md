@@ -11,6 +11,7 @@ Table of Content
     - [Free cases](#free-cases)
     - [None free cases from Pimoroni](#none-free-cases-from-pimoroni)
   - [Show case](#show-case)
+  - [Known issue with OS update](#Know issue)
 ## Overview
 This project is to display information on a 4", 5.7" or 7,3" e-ink display from the Spotify web api.</br>
 Let you control via the 4 Buttons on the Pimoroni Display your Spotify playback.</br>
