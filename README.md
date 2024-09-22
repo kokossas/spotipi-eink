@@ -35,6 +35,10 @@ The display refresh time is ~30 seconds.
 ```
 sudo raspi-config
 ```
+* Addd dtoverlay=spi0-0cs to the end of /boot/firmware/config.txt and reboot the raspberry pi.
+```
+sudo vi /boot/firmware/config.txt
+```
 
 * Download the install script
 ```
