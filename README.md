@@ -12,6 +12,7 @@ Table of Content
     - [None free cases from Pimoroni](#none-free-cases-from-pimoroni)
   - [Show case](#show-case)
   - [Known issue with OS update](#know-issue)
+
 ## Overview
 This project displays album artwork and song info on a 4", 5.7" or 7,3" e-ink display from the Spotify web api.</br>
 You can also control Spotify via the 4 Buttons on the Pimoroni Display.</br>
@@ -146,6 +147,7 @@ journalctl -u spotipi-eink-display.service -u spotipi-eink-buttons.service --sin
 Spotipi-eink creates its own Python environment because since Raspberry PI OS **Bookworm** insists on protected environments for Python See:
 * [Python on Raspberry Pi](https://www.raspberrypi.com/documentation/computers/os.html#python-on-raspberry-pi)
 * [PEP668](https://peps.python.org/pep-0668/)
+
 This should be unnecessary, but if you wish to manually execute the Python script you can load into the Virtual Python environment with the following commands. When in the Virtual Python environment, Terminal will display **(spotipienv)**:
 ```
 cd ~
@@ -176,7 +178,6 @@ To leave the Virtual Python environment just type: **deactivate**
 Example picture of my 4" display in the Pimoroni Desktop case:
 ![spotipi-eink Logo](/images/example.jpg)
 ![spotipi-eink Logo](/images/no_song.jpg)
-
 
 ## Know issue
 Just recently(2024/08/16) the GPIO Kernel Module in Raspberry PI OS changed. You may notice with an OS update the the display stoped working or even find the error message
