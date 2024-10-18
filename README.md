@@ -13,9 +13,10 @@ Table of Content
   - [Show case](#show-case)
   - [Known issue with OS update](#know-issue)
 ## Overview
-This project is to display information on a 4", 5.7" or 7,3" e-ink display from the Spotify web api.</br>
-Let you control via the 4 Buttons on the Pimoroni Display your Spotify playback.</br>
-Project [Youtube Video](https://www.youtube.com/watch?v=uQYIAYa27ds) from [Ryan Ward ](https://github.com/ryanwa18)
+This project displays album artwork and song info on a 4", 5.7" or 7,3" e-ink display from the Spotify web api.</br>
+You can also control Spotify via the 4 Buttons on the Pimoroni Display.</br>
+The original concecpt came from [Ryan Ward ](https://github.com/ryanwa18) and his video: [Youtube Video](https://www.youtube.com/watch?v=uQYIAYa27ds)
+This version is updated to account for the latest OS changes, virtual environments, and adds button controlls. 
 
 Button functions:
 * Button A - next track
@@ -23,7 +24,7 @@ Button functions:
 * Button C - play/pause
 * Button D - toggle repeat order: track, context(playlist), off
 
-I is recommendation to use Raspberry Pi Zero 2.
+I recommend a Raspberry Pi Zero 2 with GPIO pins, which has the necessary power and is small enough to make a sleek final product.
 
 The display refresh time is ~30 seconds.
 
@@ -52,11 +53,11 @@ chmod +x setup.sh
 bash setup.sh
 ```
 
-After the spotipi-eink is installed you have 2 systemd services:
+After the spotipi-eink is installed you will have 2 new systemd services:
 * spotipi-eink-display.service
 * spotipi-eink-buttons.service (only for Pimoroni displays)
 
-This services run as the user with that you executed the setup.sh.
+This services run as the user with you used to execute setup.sh.
 
 You control the services via systemctl **start, stop, status** *(services-name)*. Example get the status of *spotipi-eink-display.service*:
 ```
@@ -77,36 +78,6 @@ Oct 31 09:30:06 spotipi spotipi-eink-display[4108]: Spotipi eInk Display - Servi
 Oct 31 09:30:07 spotipi spotipi-eink-display[4108]: Spotipi eInk Display - Loading Pimoroni inky lib
 Oct 31 09:30:07 spotipi spotipi-eink-display[4108]: Spotipi eInk Display - Service started
 ```
-
-With the latest Raspberry PI OS **Bookworm** you have no more */var/log/syslog* you have to use *journalctl*. To view the *spotipi-eink-display.service* and *spotipi-eink-buttons.service* logs use the following command:
-
-```
-# see all time logs
-journalctl -u spotipi-eink-display.service -u spotipi-eink-buttons.service
-```
-or
-```
-# see only today logs
-journalctl -u spotipi-eink-display.service -u spotipi-eink-buttons.service --since today
-```
-
-Spotipi-eink creates its own Python environment because since Raspberry PI OS **Bookworm** the system Python environment is protect See:
-* [Python on Raspberry Pi](https://www.raspberrypi.com/documentation/computers/os.html#python-on-raspberry-pi)
-* [PEP668](https://peps.python.org/pep-0668/)
-
-If you like to manual execute the Python script you have to load into the Virtual Python environment like the following commands shows. You will see then in front of you terminal a **(spotipienv)**:
-```
-cd ~
-. spotipi/spotipi-eink/spotipienv/bin/activate
-```
-Additional you need to export the following 3 environment variable on you shell that the spotipy library is working.
-```
-export SPOTIPY_CLIENT_ID=''
-export SPOTIPY_CLIENT_SECRET=''
-export SPOTIPY_REDIRECT_URI=''
-```
-If you like to leave the Virtual Python environment just type: **deactivate**
-
 
 ## Configuration
 In the file **spotipi/config/eink_options.ini** you can modify:
@@ -162,6 +133,32 @@ background_mode = fit
 ## Software
 * [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 
+With the latest Raspberry PI OS **Bookworm** */var/log/syslog* is no longer an option for logs. Instead, you have to use *journalctl*. To view the *spotipi-eink-display.service* and *spotipi-eink-buttons.service* logs use the following command:
+```
+# see all time logs
+journalctl -u spotipi-eink-display.service -u spotipi-eink-buttons.service
+```
+or
+```
+# see only today logs
+journalctl -u spotipi-eink-display.service -u spotipi-eink-buttons.service --since today
+```
+Spotipi-eink creates its own Python environment because since Raspberry PI OS **Bookworm** insists on protected environments for Python See:
+* [Python on Raspberry Pi](https://www.raspberrypi.com/documentation/computers/os.html#python-on-raspberry-pi)
+* [PEP668](https://peps.python.org/pep-0668/)
+This should be unnecessary, but if you wish to manually execute the Python script you can load into the Virtual Python environment with the following commands. When in the Virtual Python environment, Terminal will display **(spotipienv)**:
+```
+cd ~
+. spotipi/spotipi-eink/spotipienv/bin/activate
+```
+Additionally you need to export the following 3 environment variables on you shell that the spotipy library is working.
+```
+export SPOTIPY_CLIENT_ID=''
+export SPOTIPY_CLIENT_SECRET=''
+export SPOTIPY_REDIRECT_URI=''
+```
+To leave the Virtual Python environment just type: **deactivate**
+
 ## 3D printing
 ### Free cases
 * [SpotiPi E-Ink - Inky Impression 5.7" Case](https://cults3d.com/en/3d-model/gadget/spotipi-e-ink-inky-impression-5-7-case)
@@ -179,6 +176,7 @@ background_mode = fit
 Example picture of my 4" display in the Pimoroni Desktop case:
 ![spotipi-eink Logo](/images/example.jpg)
 ![spotipi-eink Logo](/images/no_song.jpg)
+
 
 ## Know issue
 Just recently(2024/08/16) the GPIO Kernel Module in Raspberry PI OS changed. You may notice with an OS update the the display stoped working or even find the error message
