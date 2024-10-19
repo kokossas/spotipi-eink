@@ -172,7 +172,9 @@ Example picture of my 4" display in the Pimoroni Desktop case:
 ![spotipi-eink no song](/images/no_song.jpg)
 
 ## Know issue
-Just recently(2024/08/16) the GPIO Kernel Module in Raspberry PI OS changed. You may notice with an OS update the the display stoped working or even find the error message
+Just recently(2024/08/16) the GPIO Kernel Module in Raspberry PI OS changed. 
+
+You may notice with an OS update that your Pimironi display stoped working or even find the error message
 ```
 Woah there, some pins we need are in use!
      Chip Select: (line 8, GPIO8) currently claimed by spi0 CS0
@@ -182,24 +184,8 @@ example:
 ```
 sudo vi /boot/firmware/config.txt
 ```
-put it in the [all] saection like this:
+put it in the [all] section at the end of the file a line like this:
 ```
-# Don't have the firmware create an initial video= setting in cmdline.txt.
-# Use the kernel's default instead.
-disable_fw_kms_setup=1
-
-# Disable compensation for displays with overscan
-disable_overscan=1
-
-# Run as fast as firmware / board allows
-arm_boost=1
-
-[cm4]
-# Enable host mode on the 2711 built-in XHCI USB controller.
-# This line should be removed if the legacy DWC2 controller is required
-# (e.g. for USB device mode) or if USB support is not required.
-otg_mode=1
-
 [all]
 dtoverlay=spi0-0cs
 ```
