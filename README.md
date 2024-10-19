@@ -33,7 +33,7 @@ The display refresh time is ~30 seconds.
 * Create a new application within the [Spotify developer dashboard](https://developer.spotify.com/dashboard/applications)
 * Edit the settings of the application within the dashboard.
     * Set the redirect uri to local url http://localhost/redirect
-
+* For the the Rapsberry PI Zero 2 use the "Raspberry PI OS Lite (64-bit)"
 * Download the install script
 ```
 wget https://raw.githubusercontent.com/Gabbajoe/spotipi-eink/main/setup.sh
