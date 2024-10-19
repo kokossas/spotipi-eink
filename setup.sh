@@ -241,11 +241,12 @@ arm_boost=1
 # for the pimironi displays to work
 dtoverlay=spi0-0cs
 EOL
-    echo "Configuration added to ${config_file}"
-    echo "Please reboot that the changes to ${config_file} take effect."
-    reboot=1    
-else
-    echo "Configuration already exists in ${config_file}"
+        echo "Configuration added to ${config_file}"
+        echo "Please reboot that the changes to ${config_file} take effect."
+        reboot=1    
+    else
+        echo "Configuration already exists in ${config_file}"
+    fi
 fi
 echo
 echo "SETUP IS COMPLETE"
