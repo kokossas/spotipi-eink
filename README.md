@@ -16,7 +16,7 @@ Table of Content
 ## Overview
 This project displays album artwork and song info on a 4", 5.7" or 7,3" e-ink display from the Spotify web api.</br>
 You can also control Spotify via the 4 Buttons on the Pimoroni Display.</br>
-The original concecpt came from [Ryan Ward ](https://github.com/ryanwa18) and his video: [Youtube Video](https://www.youtube.com/watch?v=uQYIAYa27ds)
+The original concecpt came from [Ryan Ward ](https://github.com/ryanwa18) and his video: [Youtube Video](https://www.youtube.com/watch?v=uQYIAYa27ds)</br>
 This version is updated to account for the latest OS changes, virtual environments, and adds button controlls. 
 
 Button functions:
@@ -32,16 +32,7 @@ The display refresh time is ~30 seconds.
 ## Getting Started
 * Create a new application within the [Spotify developer dashboard](https://developer.spotify.com/dashboard/applications)
 * Edit the settings of the application within the dashboard.
-    * Set the redirect uri to any local url such as http://localhost/redirect
-
-* Enable SPI and I2C under "Interface Options" with the command:
-```
-sudo raspi-config
-```
-* Addd dtoverlay=spi0-0cs to the end of /boot/firmware/config.txt and reboot the raspberry pi.
-```
-sudo vi /boot/firmware/config.txt
-```
+    * Set the redirect uri to local url http://localhost/redirect
 
 * Download the install script
 ```
@@ -153,7 +144,7 @@ This should be unnecessary, but if you wish to manually execute the Python scrip
 cd ~
 . spotipi/spotipi-eink/spotipienv/bin/activate
 ```
-Additionally you need to export the following 3 environment variables on you shell that the spotipy library is working.
+Additionally you need to export the following 3 environment variables on you shell that the spotipy library is working. You can fnd the values for them in then file `/etc/systemd/system/spotipi-eink-display.service.d/spotipi-eink-display_env.conf`
 ```
 export SPOTIPY_CLIENT_ID=''
 export SPOTIPY_CLIENT_SECRET=''
@@ -163,9 +154,10 @@ To leave the Virtual Python environment just type: **deactivate**
 
 ## 3D printing
 ### Free cases
-* [SpotiPi E-Ink - Inky Impression 5.7" Case](https://cults3d.com/en/3d-model/gadget/spotipi-e-ink-inky-impression-5-7-case)
-* [Pimoroni Inky Impression Case - 5.7" I guess](https://www.printables.com/de/model/51765-pimoroni-inky-impression-case/files)
+* [SpotiPi E-Ink - for Inky Impression 5.7" Case](https://cults3d.com/en/3d-model/gadget/spotipi-e-ink-inky-impression-5-7-case)
+* [Pimoroni Inky Impression Case - for Inky Impression 5.7" Case](https://www.printables.com/de/model/51765-pimoroni-inky-impression-case/files)
 * [Inky Impression 5.7" Frame](https://www.printables.com/de/model/603008-inky-impression-57-frame)
+* [DIY Raspberry Pi Spotify Eink Thing Case - for Inky Impression 5.7" Case](https://makerworld.com/en/models/713543#profileId-644007)
 * [Inky Impression 7.3 e-Paper frame/case](https://www.printables.com/de/model/585713-inky-impression-73-e-paper-framecase)
 * [Pimoroni 7 color EInk display Frame](https://www.thingiverse.com/thing:4666925)
 * [Spotipi-eink Waveshare 4 inch case](https://www.printables.com/model/634213-spotipi-eink-waveshare-4-inch-case)
@@ -176,8 +168,8 @@ To leave the Virtual Python environment just type: **deactivate**
 
 ## Show case
 Example picture of my 4" display in the Pimoroni Desktop case:
-![spotipi-eink Logo](/images/example.jpg)
-![spotipi-eink Logo](/images/no_song.jpg)
+![spotipi-eink example](/images/example.jpg)
+![spotipi-eink no song](/images/no_song.jpg)
 
 ## Know issue
 Just recently(2024/08/16) the GPIO Kernel Module in Raspberry PI OS changed. You may notice with an OS update the the display stoped working or even find the error message
