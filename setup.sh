@@ -81,7 +81,7 @@ fi
 echo
 echo "###### Display setup"
 PS3="Please select your Display Model: "
-options=("Pimoroni Inky Impression 4 (640x400)" "Waveshare 4.01inch ACeP 4 (640x400)" "Pimoroni Inky Impression 5.7 (600x448)" "Pimoroni Inky Impression 7.3 (800x480)")
+options=("Pimoroni Inky Impression 4 (640x400)" "Waveshare 4.01inch ACeP 4 (640x400)" "Pimoroni Inky Impression 5.7 (600x448)" "Pimoroni Inky Impression 7.3 (800x480)" "Waveshare 7.5 (800x480)")
 select opt in "${options[@]}"
 do
     case $opt in
@@ -119,6 +119,15 @@ do
             echo "album_cover_small_px = 300" >> ${install_path}/config/eink_options.ini
             echo "model = inky" >> ${install_path}/config/eink_options.ini
             export BUTTONS=1
+            break
+            ;;
+        "Waveshare 7.5 (800x480)")
+            echo "[DEFAULT]" >> ${install_path}/config/eink_options.ini
+            echo "width = 800" >> ${install_path}/config/eink_options.ini
+            echo "height = 480" >> ${install_path}/config/eink_options.ini
+            echo "album_cover_small_px = 300" >> ${install_path}/config/eink_options.ini
+            echo "model = waveshare75" >> ${install_path}/config/eink_options.ini
+            export BUTTONS=0
             break
             ;;
         *)

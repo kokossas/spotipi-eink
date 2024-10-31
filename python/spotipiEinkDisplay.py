@@ -56,6 +56,10 @@ class SpotipiEinkDisplay:
         if self.config.get('DEFAULT', 'model') == 'waveshare4':
             from lib import epd4in01f
             self.wave4 = epd4in01f
+            self.logger.info('Loading Waveshare 7.5" lib')
+        if self.config.get('DEFAULT', 'model') == 'waveshare75':
+            from lib import epd7in5_V2
+            self.wave75 = epd7in5_V2
             self.logger.info('Loading Waveshare 4" lib')
 
     def _init_logger(self):
@@ -151,6 +155,10 @@ class SpotipiEinkDisplay:
                 epd = self.wave4.EPD()
                 epd.init()
                 epd.Clear()
+            if self.config.get('DEFAULT', 'model') == 'waveshare75':
+                epd = self.wave75.EPD()
+                epd.init()
+                epd.Clear()
         except Exception as e:
             self.logger.error(f'Display clean error: {e}')
             self.logger.error(traceback.format_exc())
@@ -194,6 +202,11 @@ class SpotipiEinkDisplay:
                 epd = self.wave4.EPD()
                 epd.init()
                 epd.display(epd.getbuffer(self._convert_image_wave(image)))
+                epd.sleep()
+            if self.config.get('DEFAULT', 'model') == 'waveshare75':
+                epd = self.wave75.EPD()
+                epd.init()
+                epd.display(epd.getbuffer(image))
                 epd.sleep()
         except Exception as e:
             self.logger.error(f'Display image error: {e}')
