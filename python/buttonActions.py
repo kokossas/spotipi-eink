@@ -1,8 +1,6 @@
 import sys
 import os
 import configparser
-import spotipy
-import spotipy.util as util
 import signal
 import RPi.GPIO as GPIO
 
@@ -36,31 +34,44 @@ def handle_button(pin):
     global current_state
     global config
     # do this every time to load the latest refresh token from the displayCoverArt.py->getSongInfo.py
-    scope = 'user-read-currently-playing,user-modify-playback-state'
-    token = util.prompt_for_user_token(
-        username=config['DEFAULT']['username'],
-        scope=scope, cache_path=config['DEFAULT']['token_file'])
-    if not token:
-        print(f"Error with token: {config['DEFAULT']['token_file']}")
-        return
-    sp = spotipy.Spotify(auth=token)
+    # use the shared client
+    global sp
     label = LABELS[BUTTONS.index(pin)]
-    if label == 'A':
-        sp.next_track()
+
+    try:
+        if label == 'A':
+            sp.next_track()
+        elif label == 'B':
+            sp.previous_track()
+        elif label == 'C':
+            playback = sp.currently_playing(additional_types='episode')
+            if playback and playback.get('is_playing', False):
+                sp.pause_playback()
+            else:
+                sp.start_playback()
+        elif label == 'D':
+            try:
+                playback = sp.currently_playing(additional_types='episode')
+            except Exception:
+                playback = None
+            if not playback or not playback.get('is_playing', False):
+                open('/home/stavri/spotipi-eink/python/spotipi_cycle_idle','w').close()
         return
-    if label == 'B':
-        sp.previous_track()
-        return
-    if label == 'C':
-        try:
-            sp.start_playback()
-        except spotipy.exceptions.SpotifyException:
-            sp.pause_playback()
-        return
-    if label == 'D':
-        current_state = get_state(current_state)
-        sp.repeat(state=current_state)
-        return
+
+    except Exception as e:
+        # fallback to cache-file auth with no prompts
+        import spotipy
+        import spotipy.util as util
+        token = util.prompt_for_user_token(
+            username=config['DEFAULT']['username'],
+            scope='user-read-currently-playing,user-modify-playback-state',
+            cache_path=config['DEFAULT']['token_file']
+        )
+        if token:
+            sp = spotipy.Spotify(auth=token)
+            # retry this same button action once
+            handle_button(pin)
+        # if token is still None, we silently give up
 
 
 # CTR + C event clean up GPIO setup and exit nicly
@@ -71,6 +82,24 @@ def signal_handler(sig, frame):
 
 def main():
     # Set up RPi.GPIO with the "BCM" numbering scheme
+    # ── ONE-TIME Spotify setup ──
+    from spotipy.oauth2 import SpotifyOAuth
+    import spotipy
+    import configparser
+
+    global sp
+    cfg = configparser.ConfigParser()
+    cfg.read(os.path.join(os.path.dirname(__file__),
+                          '..', 'config', 'eink_options.ini'))
+    scope = 'user-read-currently-playing,user-modify-playback-state'
+    auth = SpotifyOAuth(
+        scope=scope,
+        cache_path=cfg['DEFAULT']['token_file'],
+        open_browser=False
+    )
+    sp = spotipy.Spotify(auth_manager=auth)
+
+    # now your GPIO setup
     GPIO.setmode(GPIO.BCM)
 
     # Buttons connect to ground when pressed, so we should set them up
