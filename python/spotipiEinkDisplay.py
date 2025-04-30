@@ -2,14 +2,13 @@ import time
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
-import spotipy
-import spotipy.util as util
 import os
 import traceback
 import configparser
 import requests
 import signal
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance, ImageFilter
+from typing import Optional
 
 
 # recursion limiter for get song info to not go to infinity as decorator
@@ -36,6 +35,15 @@ class SpotipiEinkDisplay:
         # Configuration for the matrix
         self.config = configparser.ConfigParser()
         self.config.read(os.path.join(os.path.dirname(__file__), '..', 'config', 'eink_options.ini'))
+        from spotipy.oauth2 import SpotifyOAuth
+        import spotipy
+
+        scope = 'user-read-currently-playing,user-modify-playback-state'
+        token_cache = self.config.get('DEFAULT', 'token_file')
+        self.auth = SpotifyOAuth(scope=scope,
+                                 cache_path=token_cache,
+                                 open_browser=False)
+        self.sp   = spotipy.Spotify(auth_manager=self.auth)
         # set spotipoy lib logger
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S', filename=self.config.get('DEFAULT', 'spotipy_log'), level=logging.INFO)
         logger = logging.getLogger('spotipy_logger')
@@ -44,7 +52,9 @@ class SpotipiEinkDisplay:
         logger.addHandler(handler)
         # prep some vars before entering service loop
         self.song_prev = ''
+        self.cycled_this_idle = False
         self.pic_counter = 0
+        self.song_change_counter = 0 
         self.logger = self._init_logger()
         self.logger.info('Service instance created')
         if self.config.get('DEFAULT', 'model') == 'inky':
@@ -56,10 +66,6 @@ class SpotipiEinkDisplay:
         if self.config.get('DEFAULT', 'model') == 'waveshare4':
             from lib import epd4in01f
             self.wave4 = epd4in01f
-            self.logger.info('Loading Waveshare 7.5" lib')
-        if self.config.get('DEFAULT', 'model') == 'waveshare75':
-            from lib import epd7in5_V2
-            self.wave75 = epd7in5_V2
             self.logger.info('Loading Waveshare 4" lib')
 
     def _init_logger(self):
@@ -155,10 +161,6 @@ class SpotipiEinkDisplay:
                 epd = self.wave4.EPD()
                 epd.init()
                 epd.Clear()
-            if self.config.get('DEFAULT', 'model') == 'waveshare75':
-                epd = self.wave75.EPD()
-                epd.init()
-                epd.Clear()
         except Exception as e:
             self.logger.error(f'Display clean error: {e}')
             self.logger.error(traceback.format_exc())
@@ -203,72 +205,251 @@ class SpotipiEinkDisplay:
                 epd.init()
                 epd.display(epd.getbuffer(self._convert_image_wave(image)))
                 epd.sleep()
-            if self.config.get('DEFAULT', 'model') == 'waveshare75':
-                epd = self.wave75.EPD()
-                epd.init()
-                epd.display(epd.getbuffer(image))
-                epd.sleep()
         except Exception as e:
             self.logger.error(f'Display image error: {e}')
             self.logger.error(traceback.format_exc())
 
-    def _gen_pic(self, image: Image, artist: str, title: str) -> Image:
-        """Generates the Picture for the display
+    def _gen_pic(self, image: Optional[Image], artist: str, title: str, duration_ms: Optional[int], progress_ms: Optional[int], is_playing: bool) -> Image:
+        import os
+        from PIL import ImageDraw, ImageFont
+        import textwrap
+        try:
+            from colorthief import ColorThief
+            import io
+        except ImportError:
+            ColorThief = None
 
-        Args:
-            config (configparser.ConfigParser): Config parser object
-            image (Image): album cover to be used
-            artist (str): Artist text
-            title (str): Song text
+        target_w = self.config.getint('DEFAULT', 'width')
+        target_h = self.config.getint('DEFAULT', 'height')
 
-        Returns:
-            Image: The finished image
-        """
-        album_cover_small_px = self.config.getint('DEFAULT', 'album_cover_small_px')
-        offset_px_left = self.config.getint('DEFAULT', 'offset_px_left')
-        offset_px_right = self.config.getint('DEFAULT', 'offset_px_right')
-        offset_px_top = self.config.getint('DEFAULT', 'offset_px_top')
-        offset_px_bottom = self.config.getint('DEFAULT', 'offset_px_bottom')
-        offset_text_px_shadow = self.config.getint('DEFAULT', 'offset_text_px_shadow')
-        text_direction = self.config.get('DEFAULT', 'text_direction')
-        # The width and height of the background
-        bg_w, bg_h = image.size
-        if self.config.get('DEFAULT', 'background_mode') == 'fit':
-            if bg_w < self.config.getint('DEFAULT', 'width') or bg_w > self.config.getint('DEFAULT', 'width'):
-                image_new = ImageOps.fit(image=image, size=(self.config.getint('DEFAULT', 'width'), self.config.getint('DEFAULT', 'height')), centering=(0, 0))
+        PALETTE = {
+            "black": (0, 0, 0), "white": (255, 255, 255), "green": (0, 255, 0),
+            "blue": (0, 0, 255), "red": (255, 0, 0), "yellow": (255, 255, 0),
+            "orange": (255, 128, 0)
+        }
+
+        def get_closest_color(rgb_tuple, palette):
+            if not rgb_tuple: return palette["black"]
+            min_dist = float('inf')
+            closest_color_val = palette["black"]
+            for color_rgb in palette.values():
+                dist = sum([(a - b) ** 2 for a, b in zip(rgb_tuple, color_rgb)]) ** 0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_color_val = color_rgb
+            return closest_color_val
+
+        bg_color = PALETTE["black"]
+        if is_playing and image:
+            bg_img = image.copy().convert("RGB")
+
+            # ▶ preserve aspect ratio: zoom & center‑crop in one step
+            bg_img = ImageOps.fit(
+                bg_img,
+                (target_w, target_h),
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.5),
+            )
+
+            # Apply blur
+            bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=15))
+            # Reduce brightness
+            enhancer = ImageEnhance.Brightness(bg_img)
+            bg_img = enhancer.enhance(0.8)  # 0.8 = 80% brightness
+            img_new = bg_img
+        else:
+            if image:
+                bg_img = image.copy().convert("RGB")
+
+                # ▶ preserve aspect ratio: zoom & center‑crop in one step
+                bg_img = ImageOps.fit(
+                    bg_img,
+                    (target_w, target_h),
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5),
+                )
+
+                # Blur
+                bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=15))
+
+                # Darken
+                enhancer = ImageEnhance.Brightness(bg_img)
+                img_new = enhancer.enhance(0.8)
             else:
-                # no need to expand just crop
-                image_new = image.crop((0, 0, self.config.getint('DEFAULT', 'width'), self.config.getint('DEFAULT', 'height')))
-        if self.config.get('DEFAULT', 'background_mode') == 'repeat':
-            if bg_w < self.config.getint('DEFAULT', 'width') or bg_h < self.config.getint('DEFAULT', 'height'):
-                # we need to repeat the background
-                # Creates a new empty image, RGB mode, and size of the display
-                image_new = Image.new('RGB', (self.config.getint('DEFAULT', 'width'), self.config.getint('DEFAULT', 'height')))
-                # Iterate through a grid, to place the background tile
-                for x in range(0, self.config.getint('DEFAULT', 'width'), bg_w):
-                    for y in range(0, self.config.getint('DEFAULT', 'height'), bg_h):
-                        # paste the image at location x, y:
-                        image_new.paste(image, (x, y))
-            else:
-                # no need to repeat just crop
-                image_new = image.crop((0, 0, self.config.getint('DEFAULT', 'width'), self.config.getint('DEFAULT', 'height')))
-        if self.config.getboolean('DEFAULT', 'album_cover_small'):
-            cover_smaller = image.resize([album_cover_small_px, album_cover_small_px], Image.LANCZOS)
-            album_pos_x = (self.config.getint('DEFAULT', 'width') - album_cover_small_px) // 2
-            image_new.paste(cover_smaller, [album_pos_x, offset_px_top])
-        font_title = ImageFont.truetype(self.config.get('DEFAULT', 'font_path'), self.config.getint('DEFAULT', 'font_size_title'))
-        font_artist = ImageFont.truetype(self.config.get('DEFAULT', 'font_path'), self.config.getint('DEFAULT', 'font_size_artist'))
-        if text_direction == 'top-down':
-            title_position_y = album_cover_small_px + offset_px_top + 10
-            title_height = self._fit_text_top_down(img=image_new, text=title, text_color='white', shadow_text_color='black', font=font_title, font_size=self.config.getint('DEFAULT', 'font_size_title'), y_offset=title_position_y, x_start_offset=offset_px_left, x_end_offset=offset_px_right, offset_text_px_shadow=offset_text_px_shadow)
-            artist_position_y = album_cover_small_px + offset_px_top + 10 + title_height
-            self._fit_text_top_down(img=image_new, text=artist, text_color='white', shadow_text_color='black', font=font_artist, font_size=self.config.getint('DEFAULT', 'font_size_artist'), y_offset=artist_position_y, x_start_offset=offset_px_left, x_end_offset=offset_px_right, offset_text_px_shadow=offset_text_px_shadow)
-        if text_direction == 'bottom-up':
-            artist_position_y = self.config.getint('DEFAULT', 'height') - (offset_px_bottom + self.config.getint('DEFAULT', 'font_size_artist'))
-            artist_height = self._fit_text_bottom_up(img=image_new, text=artist, text_color='white', shadow_text_color='black', font=font_artist, font_size=self.config.getint('DEFAULT', 'font_size_artist'), y_offset=artist_position_y, x_start_offset=offset_px_left, x_end_offset=offset_px_right, offset_text_px_shadow=offset_text_px_shadow)
-            title_position_y = self.config.getint('DEFAULT', 'height') - (offset_px_bottom + self.config.getint('DEFAULT', 'font_size_title')) - artist_height
-            self._fit_text_bottom_up(img=image_new, text=title, text_color='white', shadow_text_color='black', font=font_title, font_size=self.config.getint('DEFAULT', 'font_size_title'), y_offset=title_position_y, x_start_offset=offset_px_left, x_end_offset=offset_px_right, offset_text_px_shadow=offset_text_px_shadow)
-        return image_new
+                img_new = Image.new('RGB', (target_w, target_h), PALETTE["black"])
+
+        draw = ImageDraw.Draw(img_new)
+
+        art_size = int(min(target_w // 2, target_h - 100)*0.9)
+        art_y = (target_h - art_size) // 2
+        art_x = art_y
+
+        if is_playing and image:
+            album_art = image.resize((art_size, art_size), Image.Resampling.LANCZOS)
+            corner_radius = 20
+            mask = Image.new('L', (art_size, art_size), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.rounded_rectangle((0, 0, art_size, art_size), fill=255, radius=corner_radius)
+            img_new.paste(album_art.convert("RGB"), (art_x, art_y), mask)
+        elif image:
+            image = image.convert("RGB")
+            if image.height == 0:
+                image = Image.new("RGB", (100, target_h), (0, 0, 0))  # fail-safe
+            new_h = target_h
+            new_w = int(image.width * (new_h / image.height))
+            fitted = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            img_new.paste(fitted, (0, 0))
+
+
+        else:
+            placeholder_color = PALETTE["white"] if bg_color == PALETTE["black"] else PALETTE["black"]
+            draw.rounded_rectangle([(art_x, art_y), (art_x + art_size, art_y + art_size)], outline=placeholder_color, radius=20, width=2)
+
+        try:
+            font_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
+            font_path_bold = self.config.get('DEFAULT', 'font_path_bold', fallback=os.path.join(font_dir, 'CircularStd-Bold.otf'))
+            font_path_regular = self.config.get('DEFAULT', 'font_path_regular', fallback=font_path_bold)
+            font_path_unicode = os.path.join(font_dir, 'NotoSans-Regular.ttf')
+            font_size_title = self.config.getint('DEFAULT', 'font_size_title', fallback=24)
+            font_size_artist = self.config.getint('DEFAULT', 'font_size_artist', fallback=18)
+
+            font_title = ImageFont.truetype(font_path_unicode, font_size_title)
+            #try:
+            #    font_title = ImageFont.truetype(font_path_bold, font_size_title)
+            #except:
+            #    font_title = ImageFont.truetype(font_path_unicode, font_size_title)
+
+            font_artist = ImageFont.truetype(font_path_unicode, font_size_artist)
+            #try:
+            #    font_artist = ImageFont.truetype(font_path_regular, font_size_artist)
+            #except:
+            #    font_artist = ImageFont.truetype(font_path_unicode, font_size_artist)
+
+        except Exception as e:
+            self.logger.error(f"Font loading error: {e}, using default.")
+            font_title = ImageFont.load_default()
+            font_artist = ImageFont.load_default()
+
+        text_color = PALETTE["white"] if bg_color == PALETTE["black"] else PALETTE["black"]
+
+        if is_playing:
+            text_start_x = art_x + art_size + 20
+            text_width_limit = target_w - text_start_x - 15
+
+            # Fonts
+            label_font_size = 12
+            artist_font_size = 14
+
+            font_label = ImageFont.truetype(font_path_unicode, label_font_size)
+            #try:
+            #    font_label = ImageFont.truetype(font_path_bold, label_font_size)
+            #except:
+            #    font_label = ImageFont.truetype(font_path_unicode, label_font_size)
+
+            font_artist_small = ImageFont.truetype(font_path_unicode, artist_font_size)
+            #try:
+            #    font_artist_small = ImageFont.truetype(font_path_regular, artist_font_size)
+            #except:
+            #    font_artist_small = ImageFont.truetype(font_path_unicode, artist_font_size)
+
+
+            # Prepare wrapped lines
+            lines_label = ["SONG"]
+            lines_title = textwrap.wrap(title, width=max(1, text_width_limit // (font_size_title // 2)))
+            lines_artist = textwrap.wrap(artist, width=max(1, text_width_limit // (artist_font_size // 2)))
+
+            # Estimate total height
+            spacing = 5
+            total_height = (
+                label_font_size +
+                len(lines_title) * (font_size_title + spacing) +
+                len(lines_artist) * (artist_font_size + spacing) +
+                spacing * 3
+            )
+
+            # Center vertically
+            current_y = art_y + (art_size - total_height) // 2
+
+            # Draw label
+            draw.text((text_start_x, current_y), "SONG", font=font_label, fill=text_color)
+            current_y += label_font_size + spacing
+
+            # Title
+            for line in lines_title:
+                draw.text((text_start_x, current_y), line, font=font_title, fill=text_color)
+                current_y += font_size_title + spacing
+
+            current_y += spacing
+
+            # Artist
+            for line in lines_artist:
+                draw.text((text_start_x, current_y), line, font=font_artist_small, fill=text_color)
+                current_y += artist_font_size + spacing
+            # Draw Spotify logo bottom-right
+            try:
+                logo_path = os.path.expanduser('~/spotipi-eink/images/spotify_logo.png')
+                logo_img = Image.open(logo_path).convert("RGBA")
+                logo_height = 24
+                logo_ratio = logo_img.width / logo_img.height
+                logo_resized = logo_img.resize((int(logo_height * logo_ratio), logo_height), Image.Resampling.LANCZOS)
+
+                logo_x = target_w - logo_resized.width - 20
+                logo_y = target_h - logo_height - 20
+                img_new.paste(logo_resized, (logo_x, logo_y), logo_resized)
+            except Exception as e:
+                self.logger.warning(f"Could not draw Spotify logo: {e}")
+
+
+        else:
+            # Idle prompt
+            idle_text = "No song playing"
+            label_text = "LISTEN ON"
+            text_area_x = art_x + art_size + 20
+            text_area_width = target_w - text_area_x - 15
+
+
+            idle_font = font_title
+            label_font = ImageFont.truetype(font_path_unicode, 16)
+            #try:
+            #    label_font = ImageFont.truetype(font_path_bold, 16)
+            #except:
+            #    label_font = ImageFont.truetype(font_path_unicode, 16)
+
+
+            # Measure text
+            idle_bbox = draw.textbbox((0, 0), idle_text, font=idle_font)
+            label_bbox = draw.textbbox((0, 0), label_text, font=label_font)
+
+            # Load and resize logo
+            logo_path = os.path.expanduser('~/spotipi-eink/images/spotify_logo.png')
+            logo_img = Image.open(logo_path).convert("RGBA")
+            logo_height = font_size_title
+            logo_ratio = logo_img.width / logo_img.height
+            logo_resized = logo_img.resize((int(logo_height * logo_ratio), logo_height), Image.Resampling.LANCZOS)
+
+            # Positioning
+            total_block_height = idle_bbox[3] - idle_bbox[1] + 24 + logo_height
+            start_y = target_h // 2 - total_block_height // 2
+            center_x = text_area_x + text_area_width // 2
+
+            # Draw "No song playing"
+            idle_text_w = idle_bbox[2] - idle_bbox[0]
+            draw.text((center_x - idle_text_w // 2, start_y), idle_text, font=idle_font, fill=text_color)
+
+            # Draw "LISTEN ON" + logo below
+            label_w = label_bbox[2] - label_bbox[0]
+            logo_w = logo_resized.width
+            padding = 10
+            combo_w = label_w + padding + logo_w
+
+            label_x = center_x - combo_w // 2
+            label_y = start_y + (idle_bbox[3] - idle_bbox[1]) + 24
+
+            draw.text((label_x, label_y + (logo_height - (label_bbox[3] - label_bbox[1])) // 2), label_text, font=label_font, fill=text_color)
+            img_new.paste(logo_resized, (label_x + label_w + padding, label_y), logo_resized)
+
+        return img_new
+
 
     def _display_update_process(self, song_request: list):
         """Display update process that jude by the song_request list if a song is playing and we need to download the album cover or not
@@ -283,67 +464,83 @@ class SpotipiEinkDisplay:
         """
         if song_request:
             # download cover
-            image = self._gen_pic(Image.open(requests.get(song_request[1], stream=True).raw), song_request[2], song_request[0])
+            try:
+                resp = requests.get(song_request[1], stream=True)
+                resp.raise_for_status()
+                cover = Image.open(resp.raw).convert("RGB")
+            except Exception as e:
+                self.logger.error(f"Error downloading cover: {e}")
+                cover = None
+
+            image = self._gen_pic(
+                cover,
+                artist=song_request[2],
+                title=song_request[0],
+                duration_ms=None,
+                progress_ms=None,
+                is_playing=True
+            )
         else:
             # not song playing use logo
-            image = self._gen_pic(Image.open(self.config.get('DEFAULT', 'no_song_cover')), 'spotipi-eink', 'No song playing')
+            import random
+
+            idle_dir = os.path.expanduser('~/spotipi-eink/images/idle')
+            idle_files = [f for f in os.listdir(idle_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            idle_img = None
+            if idle_files:
+                selected = random.choice(idle_files)
+                try:
+                    idle_img = Image.open(os.path.join(idle_dir, selected)).convert("RGB")
+                except:
+                    idle_img = None
+
+
+            image = self._gen_pic(
+                idle_img,
+                artist="",
+                title="",
+                duration_ms=None,
+                progress_ms=None,
+                is_playing=False
+            )
+
         # clean screen every x pics
         if self.pic_counter > self.config.getint('DEFAULT', 'display_refresh_counter'):
             self._display_clean()
             self.pic_counter = 0
         # display picture on display
         self._display_image(image)
+        image.save("test_output.png")
         self.pic_counter += 1
 
     @limit_recursion(limit=10)
     def _get_song_info(self) -> list:
-        """get the current played song from Spotifys Web API
+        """get the current played song from Spotify's Web API"""
+        try:
+            # try the cached client first
+            result = self.sp.currently_playing(additional_types='episode')
+        except Exception as e:
+            self.logger.warning(f"Cached Spotify client failed ({e}), falling back to cache_file auth")
+            # fallback to old util.prompt_for_user_token (uses cache_file)
+            from spotipy.util import prompt_for_user_token
+            token = prompt_for_user_token(
+                username=self.config.get('DEFAULT','username'),
+                scope='user-read-currently-playing,user-modify-playback-state',
+                cache_path=self.config.get('DEFAULT','token_file')
+            )
+            if not token:
+                self.logger.error("Fallback auth failed, skipping song info")
+                return []
+            import spotipy
+            self.sp = spotipy.Spotify(auth=token)
+            # retry once
+            try:
+                result = self.sp.currently_playing(additional_types='episode')
+            except Exception as e2:
+                self.logger.error(f"Retry after fallback also failed ({e2})")
+                return []
 
-        Returns:
-            list: with song name, album cover url, artist's name's
-        """
-        scope = 'user-read-currently-playing,user-modify-playback-state'
-        token = util.prompt_for_user_token(username=self.config.get('DEFAULT', 'username'), scope=scope, cache_path=self.config.get('DEFAULT', 'token_file'))
-        if token:
-            sp = spotipy.Spotify(auth=token)
-            result = sp.currently_playing(additional_types='episode')
-            if result:
-                try:
-                    if result['currently_playing_type'] == 'episode':
-                        song = result["item"]["name"]
-                        artist_name = result["item"]["show"]["name"]
-                        song_pic_url = result["item"]["images"][0]["url"]
-                        return [song, song_pic_url, artist_name]
-                    if result['currently_playing_type'] == 'track':
-                        song = result["item"]["name"]
-                        artist_name = ''
-                        for artists_tmp in result["item"]["artists"]:
-                            if artist_name:
-                                artist_name += ', '
-                            artist_name += artists_tmp["name"]
-                        song_pic_url = result["item"]["album"]["images"][0]["url"]
-                        return [song, song_pic_url, artist_name]
-                    if result['currently_playing_type'] == 'unknown':
-                        # we hit the moment when spotify api has no known state about the client
-                        # simply lets retry a short moment again
-                        time.sleep(0.01)
-                        return self._get_song_info()
-                    if result['currently_playing_type'] == 'ad':
-                        # a ad is playing.. lets say no song is playing....
-                        return []
-                    # we should never hit this
-                    self.logger.error(f'Error: Unsupported currently_playing_type: {result["currently_playing_type"]}')
-                    self.logger.error(f'Error: Spotify currently_playing result content: {result}')
-                except TypeError:
-                    # https://stackoverflow.com/questions/69253296/spotipy-typeerror-nonetype-object-is-not-subscriptable-when-trying-to-acce
-                    # catch this error and simply try again.
-                    # try to get it again a short amount of time later
-                    self.logger.error('Error: TypeError')
-                    time.sleep(0.01)
-                    return self._get_song_info()
-            return []
-        else:
-            self.logger.error(f"Error: Can't get token for {self.config.get('DEFAULT', 'username')}")
+        if not result:
             return []
 
     def start(self):
@@ -354,10 +551,24 @@ class SpotipiEinkDisplay:
             while True:
                 try:
                     song_request = self._get_song_info()
+                    flag = '/home/stavri/spotipi-eink/python/spotipi_cycle_idle'
+                    if not song_request and os.path.exists(flag):
+                        os.remove(flag)
+                        # only cycle once per idle session
+                        if not self.cycled_this_idle:
+                            self._display_update_process(song_request=[])
+                            self.song_prev = 'NO_SONG'
+                            self.cycled_this_idle = True
+                        continue
                     if song_request:
                         if self.song_prev != song_request[0] + song_request[1]:
+                            self.cycled_this_idle = False
                             self.song_prev = song_request[0] + song_request[1]
                             self._display_update_process(song_request=song_request)
+                    #CONSTANT UPDATES FOR TESTING
+                    #self._display_update_process(song_request=song_request if song_request else [])
+                    #self.song_prev = song_request[0] + song_request[1] if song_request else 'NO_SONG'
+
                     if not song_request:
                         if self.song_prev != 'NO_SONG':
                             # set fake song name to update only once if no song is playing.
