@@ -1,4 +1,9 @@
-![Modified spotipi-eink](showcase/image6.jpg)
+
+<p float="left">
+  <img src="showcase/image6.jpg" alt="Showcase 1" width="250" />
+  <img src="showcase/image7.jpg" alt="Showcase 3" width="300" />
+</p>
+
 # Spotipi E-Ink (Gift version)  
 **Headless Raspberry Pi Spotify display customised as a gift**
 
@@ -27,6 +32,11 @@ Forked from [Gabbajoe’s spotipi-eink](https://github.com/Gabbajoe/spotipi-eink
 - **Unicode-friendly font** for non-English characters  
 - **3D-printed mounting, buttons & the modified frame from IKEA ([RÖDALM](https://www.ikea.com/us/en/p/roedalm-frame-black-10548867/)) (CAD in `/cad/`)  
 
+<p float="left">
+  <img src="showcase/image2.jpg" alt="Showcase 4" width="180" />
+  <img src="showcase/image4.jpg" alt="Showcase 5" width="180" />
+  <img src="showcase/image5.jpg" alt="Showcase 6" width="180" />
+</p>
 ---
 
 ## Spotify Developer Account  
