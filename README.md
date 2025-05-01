@@ -1,7 +1,7 @@
 
 <p float="left">
-  <img src="showcase/image6.jpg" alt="Showcase 1" width="250" />
-  <img src="showcase/image7.jpg" alt="Showcase 3" width="300" />
+  <img src="showcase/image6.jpg" alt="Showcase 1" width="300" />
+  <img src="showcase/image7.jpg" alt="Showcase 3" width="380" />
 </p>
 
 # Spotipi E-Ink (Gift version)  
@@ -33,9 +33,9 @@ Forked from [Gabbajoe’s spotipi-eink](https://github.com/Gabbajoe/spotipi-eink
 - **3D-printed mounting, buttons & the modified frame from IKEA ([RÖDALM](https://www.ikea.com/us/en/p/roedalm-frame-black-10548867/)) (CAD in `/cad/`)  
 
 <p float="left">
-  <img src="showcase/image2.jpg" alt="Showcase 4" width="180" />
-  <img src="showcase/image4.jpg" alt="Showcase 5" width="180" />
-  <img src="showcase/image5.jpg" alt="Showcase 6" width="180" />
+  <img src="showcase/image2.jpg" alt="Showcase 4" width="200" />
+  <img src="showcase/image4.jpg" alt="Showcase 5" width="200" />
+  <img src="showcase/image1.jpg" alt="Showcase 6" width="200" />
 </p>
 ---
 
