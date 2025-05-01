@@ -12,6 +12,27 @@ echo
 echo "###### Ensure system packages are installed:"
 sudo apt-get install python3-pip python3-venv python3-numpy git libopenjp2-7 libjpeg-dev -y
 echo
+set -e
+
+echo "Updating system..."
+sudo apt update && sudo apt upgrade -y
+
+# ─────────────────────────────────────────────────────────────────────────────
+echo "Downloading & running Wi-Fi fallback setup…"
+wget -qO /tmp/wifi-connect-setup.sh \
+     https://raw.githubusercontent.com/kokossas/wifi-connect-setup/main/wifi-connect-setup.sh
+chmod +x /tmp/wifi-connect-setup.sh
+
+# Run with sudo to ensure it can install packages & create systemd units
+sudo /tmp/wifi-connect-setup.sh
+
+# Clean up
+rm /tmp/wifi-connect-setup.sh
+echo "✅  Wi-Fi fallback portal is configured."
+# ─────────────────────────────────────────────────────────────────────────────
+
+echo "Installing Spotipi E-Ink dependencies..."
+echo
 echo "###### Enabling SPI"
 sudo raspi-config nonint do_spi 0
 echo "...done"
