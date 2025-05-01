@@ -1,3 +1,4 @@
+![Modified spotipi-eink](showcase/image6.jpg)
 # Spotipi E-Ink (Gift version)  
 **Headless Raspberry Pi Spotify display customised as a gift**
 
