@@ -30,7 +30,7 @@ Forked from [Gabbajoe’s spotipi-eink](https://github.com/Gabbajoe/spotipi-eink
   - **C** → Play/Pause  
   - **D** → Cycle idle image  
 - **Unicode-friendly font** for non-English characters  
-- **3D-printed mounting**, buttons & the modified frame from IKEA ([RÖDALM](https://www.ikea.com/us/en/p/roedalm-frame-black-10548867/)) (CAD in `/CAD/`)  
+- **3D-printed mounting**, buttons & the modified frame from IKEA ([RÖDALM](https://www.ikea.com/us/en/p/roedalm-frame-black-10548867/)) (Designs in [CAD](CAD/))  
 
 <p float="left">
   <img src="showcase/image2.jpg" alt="Showcase 4" width="200" />
